@@ -52,6 +52,7 @@ private:
     bool running;
     gfx::Program renderer;
     gfx::Vertex::Array mesh;
+    gfx::Vertex::Array mesh2;
     gfx::Camera cam;
 };
 
@@ -73,6 +74,15 @@ std::vector<gfx::Ushort> face_data = {
      3, 5, 1, 
      3, 2, 4,
      3, 4, 5,
+};
+
+std::vector<gfx::Float> triangle_mesh_data = {
+     1,  0,  0,
+     0,  1,  0,
+     0,  0,  1,
+    -1,  0,  0,
+     0, -1,  0,
+     0,  0, -1,
 };
 
 Project::Project(int w, int h)
@@ -120,7 +130,11 @@ Project::Project(int w, int h)
         << edges
         << gfx::Deactivate;
 
-    
+    // Linking 2 buffers to Vertex array "mesh"
+    mesh2
+        << gfx::Vertex::ArrayAttribute<gfx::Float[3]>{5, vertices}
+        << edges
+        << gfx::Deactivate;
 
     this->getGLVersion();
 }
@@ -156,6 +170,11 @@ void Project::render() const
     cam
         << renderer // this is the program to use to draw 
         << mesh     // draw instruction
+        << std::make_pair(start, count); // which peice out of the element array
+
+    cam
+        << renderer // this is the program to use to draw 
+        << mesh2     // draw instruction
         << std::make_pair(start, count); // which peice out of the element array
 
     output.Refresh();
