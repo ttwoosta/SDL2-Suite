@@ -76,6 +76,12 @@ namespace sdl {
                 if (lookup.count(ty) > 0) {
                     lookup.at(ty)(ev);
                 }
+                
+                if (ev.type == SDL_MOUSEBUTTONUP) {
+                    int x, y;
+                    SDL_GetMouseState(&x, &y);
+                    printf("Mouse up at position: (%d, %d)\n", x, y);
+                }
             }
         }
 
