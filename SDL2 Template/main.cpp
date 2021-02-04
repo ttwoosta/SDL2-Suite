@@ -56,6 +56,7 @@ private:
     gfx::Camera cam;
 };
 
+// x, y, z coordinates
 std::vector<gfx::Float> mesh_data = {
      1,  0,  0,
      0,  1,  0,
@@ -69,14 +70,14 @@ std::vector<gfx::Ushort> face_data = {
      0, 2, 1,
      0, 1, 5,
      0, 4, 2,
-     0, 5, 4, 
-     3, 1, 2, 
-     3, 5, 1, 
+     0, 5, 4,
+     3, 1, 2,
+     3, 5, 1,
      3, 2, 4,
      3, 4, 5,
 };
 
-std::vector<gfx::Float> triangle_mesh_data = {
+std::vector<gfx::Float> mesh_data_2 = {
      1,  0,  0,
      0,  1,  0,
      0,  0,  1,
@@ -85,16 +86,22 @@ std::vector<gfx::Float> triangle_mesh_data = {
      0,  0, -1,
 };
 
+// https://web.archive.org/web/20180301041827/https://prideout.net/archive/colors.php
+std::vector<gfx::ColorAlpha> hues{
+    6,
+    gfx::ColorAlpha{1.0f, 0.843f, 0, 1.0f}
+};
+
 Project::Project(int w, int h)
-:   SDL {sdl::Library::Video}, 
-    output {SDL, w, h}, 
-    running {true},
-    renderer { 
-        // using default 2 shader vFlat and fFlat
-        gfx::Shader{ gfx::Shader::Vertex, shader::vFlat }, 
-        gfx::Shader{ gfx::Shader::Fragment, shader::fFlat } 
-    },
-    cam{ glm::perspective(1.0f, 4.0f / 3.0f, 1.0f, 200.0f) }
+    : SDL{ sdl::Library::Video },
+    output{ SDL, w, h },
+    running{ true },
+    renderer{
+    // using default 2 shader vFlat and fFlat
+    gfx::Shader{ gfx::Shader::Vertex, file_contents("plain_vertex.glsl") },
+    gfx::Shader{ gfx::Shader::Fragment, file_contents("plain_fragment.glsl") }
+},
+cam{ glm::perspective(1.0f, 4.0f / 3.0f, 1.0f, 200.0f) }
 {
     // Program setup
     // connect the position to channel 2 
@@ -111,9 +118,9 @@ Project::Project(int w, int h)
     // move the camera to a position (0,0,-5) 
     // (translate the camera to -5 on Z-axis that back the camera out)
     // move to the right and up 1 point
-    cam << gfx::Vector3{ 1, 1, -5 };
+    cam << gfx::Vector3{ 0, 0, -5 };
 
-    
+
 
     // copy mesh_data to Array buffer
     // using StaticDraw option to tell openGL how to store the data
@@ -127,12 +134,25 @@ Project::Project(int w, int h)
     // Linking 2 buffers to Vertex array "mesh"
     mesh
         << gfx::Vertex::ArrayAttribute<gfx::Float[3]>{renderer.attributes["position"], vertices}
-        << edges
+    << edges
         << gfx::Deactivate;
+
+    // move x coord to the right 2.5 point
+    for (int i = 0; i < mesh_data_2.size(); i += 3)
+    {
+        mesh_data_2[i] += 2.5;
+    }
+
+    gfx::ArrayBuffer vertices2;
+    vertices2.Load(vertices2.StaticDraw, mesh_data_2);
+
+    gfx::ArrayBuffer color;
+    color.Load(color.StaticDraw, hues);
 
     // Linking 2 buffers to Vertex array "mesh"
     mesh2
-        << gfx::Vertex::ArrayAttribute<gfx::Float[3]>{5, vertices}
+        << gfx::Vertex::ArrayAttribute<gfx::Float[3]>{renderer.attributes["position"], vertices2}
+        << gfx::Vertex::ArrayAttribute<gfx::Float[4]>{renderer.attributes["color"], color}
         << edges
         << gfx::Deactivate;
 
@@ -165,7 +185,7 @@ void Project::render() const
 {
     constexpr gfx::Ushort start = 0;
     const gfx::Size count = face_data.size();
-
+    const gfx::Size colorSize = hues.size();
     output.Clear();
     cam
         << renderer // this is the program to use to draw 
@@ -182,7 +202,7 @@ void Project::render() const
 
 }
 
-void Project::getGLVersion() const 
+void Project::getGLVersion() const
 {
     using namespace std;
 
@@ -211,11 +231,12 @@ int main(int argc, char* argv[])
 {
     using namespace std;
     try {
-
+        cout << "Author: Tu Tong\nThe second diamond color is Gold\n\n";
         vector<string> param = vector<string>{ argv, argv + argc };
-        return Project{640, 480}(param);
+        return Project{ 640, 480 }(param);
 
-    } catch (std::exception& e) {
+    }
+    catch (std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;
     }
