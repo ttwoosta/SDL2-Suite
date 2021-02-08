@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 /*-----------------------------------------------------------------------------
  *  MACRO
@@ -25,7 +28,6 @@
  /*-----------------------------------------------------------------------------
   *  SHADER CODE
   *-----------------------------------------------------------------------------*/
-
 const char* vert = GLSL(120,
 
     attribute vec4 position;
@@ -33,19 +35,126 @@ const char* vert = GLSL(120,
 
     varying vec4 dstColor;
 
+    uniform mat4 model;
+    uniform mat4 view;                 //<-- 4x4 Transformation Matrices
+    uniform mat4 projection;
+
     void main() {
         dstColor = color;
-        gl_Position = position;
+        gl_Position = projection * view * model * position;   //<-- Apply transformation 
     }
+
 );
 
 const char* frag = GLSL(120,
+
     varying vec4 dstColor;
 
     void main() {
         gl_FragColor = dstColor;
     }
+
 );
+
+class Shader {
+
+    GLuint sID;
+
+public:
+
+    GLuint id() const { return sID; }
+
+    Shader(const char* vert, const char* frag) {
+
+        /*-----------------------------------------------------------------------------
+         *  CREATE THE SHADER
+         *-----------------------------------------------------------------------------*/
+
+         //1. CREATE SHADER PROGRAM
+        sID = glCreateProgram();
+        GLuint vID = glCreateShader(GL_VERTEX_SHADER);
+        GLuint fID = glCreateShader(GL_FRAGMENT_SHADER);
+
+        //2. LOAD SHADER SOURCE CODE
+        glShaderSource(vID, 1, &vert, NULL); //<-- Last argument specifies length of source string
+        glShaderSource(fID, 1, &frag, NULL);
+
+        //3. COMPILE
+        glCompileShader(vID);
+        glCompileShader(fID);
+
+        //4. CHECK FOR COMPILE ERRORS
+        compilerCheck(vID);
+        compilerCheck(fID);
+
+        //5. ATTACH SHADERS TO PROGRAM
+        glAttachShader(sID, vID);
+        glAttachShader(sID, fID);
+
+        //6. LINK PROGRAM
+        glLinkProgram(sID);
+
+        //7. CHECK FOR LINKING ERRORS
+        linkCheck(sID);
+
+        //8. USE PROGRAM
+        glUseProgram(sID);
+    }
+
+    void bind() { glUseProgram(sID); }
+    void unbind() { glUseProgram(0); }
+
+
+    /*-----------------------------------------------------------------------------
+     *  FUNCION TO CHECK FOR SHADER COMPILER ERRORS
+     *-----------------------------------------------------------------------------*/
+    void compilerCheck(GLuint ID) {
+        GLint comp;
+        glGetShaderiv(ID, GL_COMPILE_STATUS, &comp);
+
+        using namespace std;
+
+        if (comp == GL_FALSE) {
+            cout << "Shader Compilation FAILED" << endl;
+            GLchar messages[256];
+            glGetShaderInfoLog(ID, sizeof(messages), 0, &messages[0]);
+            cout << messages;
+        }
+    }
+
+
+    /*-----------------------------------------------------------------------------
+     *  FUNCION TO CHECK FOR SHADER LINK ERRORS
+     *-----------------------------------------------------------------------------*/
+    void linkCheck(GLuint ID) {
+        GLint linkStatus, validateStatus;
+        glGetProgramiv(ID, GL_LINK_STATUS, &linkStatus);
+
+        using namespace std;
+
+        if (linkStatus == GL_FALSE) {
+            cout << "Shader Linking FAILED" << endl;
+            GLchar messages[256];
+            glGetProgramInfoLog(ID, sizeof(messages), 0, &messages[0]);
+            cout << messages;
+        }
+
+        glValidateProgram(ID);
+        glGetProgramiv(ID, GL_VALIDATE_STATUS, &validateStatus);
+
+        cout << "Link: " << linkStatus << "  Validate: " << validateStatus << endl;
+        if (linkStatus == GL_FALSE) {
+            cout << "Shader Validation FAILED" << endl;
+            GLchar messages[256];
+            glGetProgramInfoLog(ID, sizeof(messages), 0, &messages[0]);
+            cout << messages;
+        }
+
+    }
+
+
+
+};
 
 
 /*-----------------------------------------------------------------------------
@@ -94,29 +203,12 @@ void shaderLinkCheck(GLuint ID) {
 
 }
 
-
-/*-----------------------------------------------------------------------------
- *  CREATE A PLAIN-OLD-DATA ("POD") Container for 2D Coordinates
- *-----------------------------------------------------------------------------*/
-struct vec2 {
-    vec2(float _x = 0, float _y = 0) : x(_x), y(_y) {}
-    float x, y;
-};
-
-/*-----------------------------------------------------------------------------
- *  CREATE A PLAIN-OLD-DATA ("POD") Container for RGBA values
- *-----------------------------------------------------------------------------*/
-struct vec4 {
-    vec4(float _r = 1, float _g = 1, float _b = 1, float _a = 1) : r(_r), g(_g), b(_b), a(_a) {}
-    float r, g, b, a;
-};
-
 /*-----------------------------------------------------------------------------
  *  CREATE A VERTEX OBJECT
  *-----------------------------------------------------------------------------*/
 struct Vertex {
-    vec2 position;
-    vec4 color;
+    glm::vec3 position;
+    glm::vec4 color;
 };
 
 class App {
@@ -136,13 +228,18 @@ private:
     //A Container for Vertices
     std::vector<Vertex> triangle;
 
-    //ID of shader
-    GLuint sID;
+    Shader* shader;
 
     //ID of Vertex Attribute
-    GLuint positionID, colorID;
+    GLuint positionID, normalID, colorID;
+
     //A buffer ID
-    GLuint arrayID, bufferID;
+    GLuint bufferID, elementID;                   //<-- add an elementID
+    //An array ID
+    GLuint arrayID;
+
+    //ID of Uniforms
+    GLuint modelID, viewID, projectionID;
 
 private:
     App();
@@ -239,52 +336,58 @@ bool App::Init() {
 
 void App::SetupVertex() {
 
-    //Specify the 3 VERTICES of A Triangle
-    Vertex v1 = { vec2(-1,-.5), vec4(1,0,0,1) };
-    Vertex v2 = { vec2(0,1),    vec4(0,1,0,1) };
-    Vertex v3 = { vec2(1,-.5),  vec4(0,0,1,1) };
-    triangle.push_back(v1);
-    triangle.push_back(v2);
-    triangle.push_back(v3);
+    using namespace glm;
+
+    //Specify the 8 VERTICES of A Cube
+    Vertex cube[] = {
+        {glm::vec3(1, -1,  1), glm::vec4(1,0,0,1)},
+        {glm::vec3(1,  1,  1), glm::vec4(0,1,0,1)},
+        {glm::vec3(-1,  1,  1), glm::vec4(0,0,1,1)},
+        {glm::vec3(-1, -1,  1), glm::vec4(1,0,0,1)},
+
+        {glm::vec3(1, -1, -1), glm::vec4(0,1,0,1)},
+        {glm::vec3(1,  1, -1), glm::vec4(0,0,1,1)},
+        {glm::vec3(-1,  1, -1), glm::vec4(1,0,0,1)},
+        {glm::vec3(-1, -1, -1), glm::vec4(0,1,0,1)}
+    };
+
+
+    //6-------------/5
+  //  .           // |
+//2--------------1   |
+//    .          |   |
+//    .          |   |
+//    .          |   |
+//    .          |   |
+//    7.......   |   /4
+//               | //
+//3--------------/0
+
+    GLubyte indices[24] = {
+                      0,1,2,3, //front
+                      7,6,5,4, //back
+                      3,2,6,7, //left
+                      4,5,1,0, //right
+                      1,5,6,2, //top
+                      4,0,3,7 }; //bottom
 
     /*-----------------------------------------------------------------------------
      *  CREATE THE SHADER
      *-----------------------------------------------------------------------------*/
 
-     //1. CREATE SHADER PROGRAM
-    sID = glCreateProgram();
-    GLuint vID = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fID = glCreateShader(GL_FRAGMENT_SHADER);
+    shader = new Shader(vert, frag);
 
-    //2. LOAD SHADER SOURCE CODE
-    glShaderSource(vID, 1, &vert, NULL); //<-- Last argument specifies length of source string
-    glShaderSource(fID, 1, &frag, NULL);
+    // With Shader bound, get attribute and uniform locations:
 
-    //3. COMPILE
-    glCompileShader(vID);
-    glCompileShader(fID);
+    // Get attribute locations
+    positionID = glGetAttribLocation(shader->id(), "position");
+    colorID = glGetAttribLocation(shader->id(), "color");
 
-    //4. CHECK FOR COMPILE ERRORS
-    shaderCompilerCheck(vID);
-    shaderCompilerCheck(fID);
+    // Get uniform locations
+    modelID = glGetUniformLocation(shader->id(), "model");
+    viewID = glGetUniformLocation(shader->id(), "view");
+    projectionID = glGetUniformLocation(shader->id(), "projection");
 
-    //5. ATTACH SHADERS TO PROGRAM
-    glAttachShader(sID, vID);
-    glAttachShader(sID, fID);
-
-    //6. LINK PROGRAM
-    glLinkProgram(sID);
-
-    //7. CHECK FOR LINKING ERRORS
-    shaderLinkCheck(sID);
-
-    //8. USE PROGRAM
-    glUseProgram(sID);
-
-    positionID = glGetAttribLocation(sID, "position");
-    colorID = glGetAttribLocation(sID, "color");
-
-    glUseProgram(0);
 
     /*-----------------------------------------------------------------------------
      *  CREATE THE VERTEX ARRAY OBJECT
@@ -297,25 +400,33 @@ void App::SetupVertex() {
      *-----------------------------------------------------------------------------*/
      // Generate one buffer
     glGenBuffers(1, &bufferID);
-    // Bind Array Buffer 
     glBindBuffer(GL_ARRAY_BUFFER, bufferID);
-    // Send data over buffer to GPU
-    glBufferData(GL_ARRAY_BUFFER, triangle.size() * sizeof(Vertex), &(triangle[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(Vertex), cube, GL_STATIC_DRAW);
+
+
+    /*-----------------------------------------------------------------------------
+    *  CREATE THE ELEMENT ARRAY BUFFER OBJECT
+    *-----------------------------------------------------------------------------*/
+    glGenBuffers(1, &elementID);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementID);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 24 * sizeof(GLubyte), indices, GL_STATIC_DRAW);
 
 
     /*-----------------------------------------------------------------------------
      *  ENABLE VERTEX ATTRIBUTES
      *-----------------------------------------------------------------------------*/
-     // Enable Position Attribute
     glEnableVertexAttribArray(positionID);
-    // Enable Color Attribute
     glEnableVertexAttribArray(colorID);
 
     // Tell OpenGL how to handle the buffer of data that is already on the GPU
-    glVertexAttribPointer(positionID, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(vec2));
+    //                      attrib    num   type     normalize   stride     offset
+    glVertexAttribPointer(positionID, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+    glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(glm::vec3));
 
+    // Unbind Everything (NOTE: unbind the vertex array object first)
     BINDVERTEXARRAY(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 //------------------------------------------------------------------------------
@@ -324,11 +435,24 @@ void App::Loop() {
 
 //------------------------------------------------------------------------------
 void App::Render() {
-    glUseProgram(sID);
+    static float time = 0.0;
+    time += .01;
+
     BINDVERTEXARRAY(arrayID);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glm::mat4 view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    glm::mat4 proj = glm::perspective(3.14f / 3.f, (float)WindowWidth / WindowHeight, 0.1f, -10.f);
+
+    glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(projectionID, 1, GL_FALSE, glm::value_ptr(proj));
+
+    glm::mat4 model = glm::rotate(glm::mat4(), time, glm::vec3(0, 1, 0));
+    glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
+
+    //glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, elementID);
+    glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, 0);
+
     BINDVERTEXARRAY(0);
-    glUseProgram(0);
 }
 
 //------------------------------------------------------------------------------
