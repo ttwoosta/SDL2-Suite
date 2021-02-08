@@ -1,216 +1,196 @@
-//
-//  main.cpp
-//  gfxLite
-//
-//  Created by Nevin Flanagan on 12/21/20.
-//
-
-#include <iostream>
-#include <sstream>
-#include <fstream>
-#include <vector>
-#include <chrono>
-#include <functional>
-#include <unordered_map>
-
-using namespace std::string_literals;
-
-std::string file_contents(std::string filename)
-{
-    using namespace std;
-    ifstream in{ filename, ios::in | ios::binary };
-    if (in) {
-        ostringstream contents;
-        contents << in.rdbuf();
-        return contents.str();
-    }
-    throw (errno);
-}
-
+//==============================================================================
+#include <GL/glew.h>
 #include <SDL2/SDL.h>
-#include "glm/gtc/matrix_transform.hpp"
+#include <cstdio>
+#include <iostream>
+#include <vector>
 
-#include "Display.h"
-#include "GL/Shader.h"
-#include "GL/Vertex.h"
-#include "GL/Camera.h"
+/*-----------------------------------------------------------------------------
+ *  MACRO
+ *-----------------------------------------------------------------------------*/
+#ifndef GLSL
+#define GLSL(version, A) "#version " #version "\n" #A
+#endif 
 
-namespace gfx = gl;
+#ifndef GENVERTEXARRAYS
+#define GENVERTEXARRAYS(n,id) if(GLEW_APPLE_vertex_array_object)glGenVertexArraysAPPLE(1,id);\
+	else if (GLEW_ARB_vertex_array_object) glGenVertexArrays(n,id)
+#endif
 
-class Project {
-public:
-    Project(int w, int h);
-    int operator()(const std::vector<std::string>& args);
-protected:
-    using seconds = std::chrono::duration<float>;
-    void update(seconds frame, seconds total);
-    void render() const;
-    void getGLVersion() const;
-private:
-    sdl::Library SDL;
-    Display output;
-    bool running;
-    gfx::Program renderer;
-    gfx::Vertex::Array mesh;
-    gfx::Vertex::Array mesh2;
-    gfx::Camera cam;
-};
+#ifndef BINDVERTEXARRAY
+#define BINDVERTEXARRAY(id) if(GLEW_APPLE_vertex_array_object)glBindVertexArrayAPPLE(id);\
+	else if (GLEW_ARB_vertex_array_object) glBindVertexArray(id)
+#endif
 
-// x, y, z coordinates
-std::vector<gfx::Float> mesh_data = {
-     1,  0,  0,
-     0,  1,  0,
-     0,  0,  1,
-    -1,  0,  0,
-     0, -1,  0,
-     0,  0, -1,
-};
+ /*-----------------------------------------------------------------------------
+  *  SHADER CODE
+  *-----------------------------------------------------------------------------*/
 
-std::vector<gfx::Ushort> face_data = {
-     0, 2, 1,
-     0, 1, 5,
-     0, 4, 2,
-     0, 5, 4,
-     3, 1, 2,
-     3, 5, 1,
-     3, 2, 4,
-     3, 4, 5,
-};
+const char* vert = GLSL(120,
 
-std::vector<gfx::Float> mesh_data_2 = {
-     1,  0,  0,
-     0,  1,  0,
-     0,  0,  1,
-    -1,  0,  0,
-     0, -1,  0,
-     0,  0, -1,
-};
+    attribute vec4 position;
+    attribute vec4 color;
 
-// https://web.archive.org/web/20180301041827/https://prideout.net/archive/colors.php
-std::vector<gfx::ColorAlpha> hues{
-    6,
-    gfx::ColorAlpha{1.0f, 0.843f, 0, 1.0f}
-};
+    varying vec4 dstColor;
 
-Project::Project(int w, int h)
-    : SDL{ sdl::Library::Video },
-    output{ SDL, w, h },
-    running{ true },
-    renderer{
-    // using default 2 shader vFlat and fFlat
-    gfx::Shader{ gfx::Shader::Vertex, file_contents("plain_vertex.glsl") },
-    gfx::Shader{ gfx::Shader::Fragment, file_contents("plain_fragment.glsl") }
-},
-cam{ glm::perspective(1.0f, 4.0f / 3.0f, 1.0f, 200.0f) }
-{
-    // Program setup
-    // connect the position to channel 2 
-    renderer.attributes["position"] = 2;
-
-    // setup the color to 1
-    renderer.attributes["color"] = 1;
-
-    // specify the value of a generic vertex attribute
-    // https://www.khronos.org/registry/OpenGL-Refpages/es2.0/xhtml/glVertexAttrib.xml
-    glVertexAttrib4f(1, 1, 1, 1, 1);
-
-    // camera setup
-    // move the camera to a position (0,0,-5) 
-    // (translate the camera to -5 on Z-axis that back the camera out)
-    // move to the right and up 1 point
-    cam << gfx::Vector3{ 0, 0, -5 };
-
-
-
-    // copy mesh_data to Array buffer
-    // using StaticDraw option to tell openGL how to store the data
-    gfx::ArrayBuffer vertices;
-    vertices.Load(vertices.StaticDraw, mesh_data);
-
-    // copy face_data to Element Array buffer
-    gfx::ElementArrayBuffer edges;
-    edges.Load(edges.StaticDraw, face_data);
-
-    // Linking 2 buffers to Vertex array "mesh"
-    mesh
-        << gfx::Vertex::ArrayAttribute<gfx::Float[3]>{renderer.attributes["position"], vertices}
-    << edges
-        << gfx::Deactivate;
-
-    // move x coord to the right 2.5 point
-    for (int i = 0; i < mesh_data_2.size(); i += 3)
-    {
-        mesh_data_2[i] += 2.5;
+    void main() {
+        dstColor = color;
+        gl_Position = position;
     }
+);
 
-    gfx::ArrayBuffer vertices2;
-    vertices2.Load(vertices2.StaticDraw, mesh_data_2);
+const char* frag = GLSL(120,
+    varying vec4 dstColor;
 
-    gfx::ArrayBuffer color;
-    color.Load(color.StaticDraw, hues);
-
-    // Linking 2 buffers to Vertex array "mesh"
-    mesh2
-        << gfx::Vertex::ArrayAttribute<gfx::Float[3]>{renderer.attributes["position"], vertices2}
-        << gfx::Vertex::ArrayAttribute<gfx::Float[4]>{renderer.attributes["color"], color}
-        << edges
-        << gfx::Deactivate;
-
-    this->getGLVersion();
-}
-
-int Project::operator()(const std::vector<std::string>& args)
-{
-    using std::chrono::duration_cast;
-
-    sdl::Ticks previous = SDL.GetTicks();
-    while (running) {
-        sdl::Ticks now = SDL.GetTicks();
-        update(duration_cast<seconds>(now - previous), duration_cast<seconds>(now));
-        previous = now;
-        render();
+    void main() {
+        gl_FragColor = dstColor;
     }
-    return 0;
-}
-
-void Project::update(seconds frame, seconds total)
-{
-    std::unordered_map<sdl::EventType, std::function<void(const sdl::Event&)>> responses;
-    responses.emplace(sdl::EventType::Quit, [this](const sdl::Event&) { running = false; });
-    SDL.ProcessEvents(responses);
-
-}
-
-void Project::render() const
-{
-    constexpr gfx::Ushort start = 0;
-    const gfx::Size count = face_data.size();
-    const gfx::Size colorSize = hues.size();
-    output.Clear();
-    cam
-        << renderer // this is the program to use to draw 
-        << mesh     // draw instruction
-        << std::make_pair(start, count); // which peice out of the element array
-
-    cam
-        << renderer // this is the program to use to draw 
-        << mesh2     // draw instruction
-        << std::make_pair(start, count); // which peice out of the element array
-
-    output.Refresh();
+);
 
 
-}
+/*-----------------------------------------------------------------------------
+ *  FUNCION TO CHECK FOR SHADER COMPILER ERRORS
+ *-----------------------------------------------------------------------------*/
+void shaderCompilerCheck(GLuint ID) {
+    GLint comp;
+    glGetShaderiv(ID, GL_COMPILE_STATUS, &comp);
 
-void Project::getGLVersion() const
-{
     using namespace std;
 
+    if (comp == GL_FALSE) {
+        cout << "Shader Compilation FAILED" << endl;
+        GLchar messages[256];
+        glGetShaderInfoLog(ID, sizeof(messages), 0, &messages[0]);
+        cout << messages;
+    }
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  FUNCION TO CHECK FOR SHADER LINK ERRORS
+ *-----------------------------------------------------------------------------*/
+void shaderLinkCheck(GLuint ID) {
+    GLint linkStatus, validateStatus;
+    glGetProgramiv(ID, GL_LINK_STATUS, &linkStatus);
+
+    using namespace std;
+
+    if (linkStatus == GL_FALSE) {
+        cout << "Shader Linking FAILED" << endl;
+        GLchar messages[256];
+        glGetProgramInfoLog(ID, sizeof(messages), 0, &messages[0]);
+        cout << messages;
+    }
+
+    glValidateProgram(ID);
+    glGetProgramiv(ID, GL_VALIDATE_STATUS, &validateStatus);
+
+    if (linkStatus == GL_FALSE) {
+        cout << "Shader Validation FAILED" << endl;
+        GLchar messages[256];
+        glGetProgramInfoLog(ID, sizeof(messages), 0, &messages[0]);
+        cout << messages;
+    }
+
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  CREATE A PLAIN-OLD-DATA ("POD") Container for 2D Coordinates
+ *-----------------------------------------------------------------------------*/
+struct vec2 {
+    vec2(float _x = 0, float _y = 0) : x(_x), y(_y) {}
+    float x, y;
+};
+
+/*-----------------------------------------------------------------------------
+ *  CREATE A PLAIN-OLD-DATA ("POD") Container for RGBA values
+ *-----------------------------------------------------------------------------*/
+struct vec4 {
+    vec4(float _r = 1, float _g = 1, float _b = 1, float _a = 1) : r(_r), g(_g), b(_b), a(_a) {}
+    float r, g, b, a;
+};
+
+/*-----------------------------------------------------------------------------
+ *  CREATE A VERTEX OBJECT
+ *-----------------------------------------------------------------------------*/
+struct Vertex {
+    vec2 position;
+    vec4 color;
+};
+
+class App {
+private:
+    static App Instance;
+
+    bool Running = true;
+
+    SDL_Window* Window = NULL;
+    SDL_Renderer* Renderer = NULL;
+    SDL_Surface* PrimarySurface = NULL;
+    SDL_GLContext glcontext = NULL;
+
+    static const int WindowWidth = 1024;
+    static const int WindowHeight = 768;
+
+    //A Container for Vertices
+    std::vector<Vertex> triangle;
+
+    //ID of shader
+    GLuint sID;
+
+    //ID of Vertex Attribute
+    GLuint positionID, colorID;
+    //A buffer ID
+    GLuint arrayID, bufferID;
+
+private:
+    App();
+
+    // Capture SDL Events
+    void OnEvent(SDL_Event* Event);
+
+    // Initialize our SDL game / app
+    bool Init();
+
+    // Logic loop
+    void Loop();
+
+    // Render loop (draw)
+    void Render();
+
+    // Free up resources
+    void Cleanup();
+
+public:
+    int Execute(int argc, char* argv[]);
+    void SetupVertex();
+
+public:
+    static App* GetInstance();
+
+    static int GetWindowWidth();
+    static int GetWindowHeight();
+    static void getGLVersion();
+};
+
+App App::Instance;
+
+//==============================================================================
+App::App() {
+}
+
+//------------------------------------------------------------------------------
+void App::OnEvent(SDL_Event* Event) {
+}
+
+void App::getGLVersion()
+{
     const GLubyte* p = glGetString(GL_VERSION);
-    std::cout << "OpenGL Version: " << p << std::endl;
+    printf("OpenGL Version: %s\n", p);
 
     const GLubyte* q = glGetString(GL_SHADING_LANGUAGE_VERSION);
-    std::cout << "GLSL Version: " << q << std::endl;
+    printf("GLSL Version: %s\n", q);
 
     if (GLEW_ARB_vertex_array_object) {
         printf("genVertexArrays supported\n");
@@ -227,17 +207,196 @@ void Project::getGLVersion() const
     }
 }
 
+
+//------------------------------------------------------------------------------
+bool App::Init() {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("Unable to Init SDL: %s", SDL_GetError());
+        return false;
+    }
+
+    if (!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1")) {
+        printf("Unable to Init hinting: %s", SDL_GetError());
+    }
+
+    if ((Window = SDL_CreateWindow(
+        "My SDL Game",
+        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+        WindowWidth, WindowHeight, SDL_WINDOW_OPENGL)
+        ) == NULL) {
+        printf("Unable to create SDL Window: %s", SDL_GetError());
+        return false;
+    }
+
+    PrimarySurface = SDL_GetWindowSurface(Window);
+
+    // Create an OpenGL context associated with the window.
+    // https://wiki.libsdl.org/SDL_GL_CreateContext
+    glcontext = SDL_GL_CreateContext(Window);
+
+    return true;
+}
+
+void App::SetupVertex() {
+
+    //Specify the 3 VERTICES of A Triangle
+    Vertex v1 = { vec2(-1,-.5), vec4(1,0,0,1) };
+    Vertex v2 = { vec2(0,1),    vec4(0,1,0,1) };
+    Vertex v3 = { vec2(1,-.5),  vec4(0,0,1,1) };
+    triangle.push_back(v1);
+    triangle.push_back(v2);
+    triangle.push_back(v3);
+
+    /*-----------------------------------------------------------------------------
+     *  CREATE THE SHADER
+     *-----------------------------------------------------------------------------*/
+
+     //1. CREATE SHADER PROGRAM
+    sID = glCreateProgram();
+    GLuint vID = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fID = glCreateShader(GL_FRAGMENT_SHADER);
+
+    //2. LOAD SHADER SOURCE CODE
+    glShaderSource(vID, 1, &vert, NULL); //<-- Last argument specifies length of source string
+    glShaderSource(fID, 1, &frag, NULL);
+
+    //3. COMPILE
+    glCompileShader(vID);
+    glCompileShader(fID);
+
+    //4. CHECK FOR COMPILE ERRORS
+    shaderCompilerCheck(vID);
+    shaderCompilerCheck(fID);
+
+    //5. ATTACH SHADERS TO PROGRAM
+    glAttachShader(sID, vID);
+    glAttachShader(sID, fID);
+
+    //6. LINK PROGRAM
+    glLinkProgram(sID);
+
+    //7. CHECK FOR LINKING ERRORS
+    shaderLinkCheck(sID);
+
+    //8. USE PROGRAM
+    glUseProgram(sID);
+
+    positionID = glGetAttribLocation(sID, "position");
+    colorID = glGetAttribLocation(sID, "color");
+
+    glUseProgram(0);
+
+    /*-----------------------------------------------------------------------------
+     *  CREATE THE VERTEX ARRAY OBJECT
+     *-----------------------------------------------------------------------------*/
+    GENVERTEXARRAYS(1, &arrayID);
+    BINDVERTEXARRAY(arrayID);
+
+    /*-----------------------------------------------------------------------------
+     *  CREATE THE VERTEX BUFFER OBJECT
+     *-----------------------------------------------------------------------------*/
+     // Generate one buffer
+    glGenBuffers(1, &bufferID);
+    // Bind Array Buffer 
+    glBindBuffer(GL_ARRAY_BUFFER, bufferID);
+    // Send data over buffer to GPU
+    glBufferData(GL_ARRAY_BUFFER, triangle.size() * sizeof(Vertex), &(triangle[0]), GL_STATIC_DRAW);
+
+
+    /*-----------------------------------------------------------------------------
+     *  ENABLE VERTEX ATTRIBUTES
+     *-----------------------------------------------------------------------------*/
+     // Enable Position Attribute
+    glEnableVertexAttribArray(positionID);
+    // Enable Color Attribute
+    glEnableVertexAttribArray(colorID);
+
+    // Tell OpenGL how to handle the buffer of data that is already on the GPU
+    glVertexAttribPointer(positionID, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+    glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(vec2));
+
+    BINDVERTEXARRAY(0);
+}
+
+//------------------------------------------------------------------------------
+void App::Loop() {
+}
+
+//------------------------------------------------------------------------------
+void App::Render() {
+    glUseProgram(sID);
+    BINDVERTEXARRAY(arrayID);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    BINDVERTEXARRAY(0);
+    glUseProgram(0);
+}
+
+//------------------------------------------------------------------------------
+void App::Cleanup() {
+    if (Renderer) {
+        SDL_DestroyRenderer(Renderer);
+        Renderer = NULL;
+    }
+
+    if (Window) {
+        SDL_DestroyWindow(Window);
+        Window = NULL;
+    }
+    if (glcontext != NULL) {
+        SDL_GL_DeleteContext(glcontext);
+        glcontext = NULL;
+    }
+
+    SDL_Quit();
+}
+
+//------------------------------------------------------------------------------
+int App::Execute(int argc, char* argv[]) {
+    if (!Init()) return 0;
+
+    SDL_Event Event;
+
+    glewInit();
+    getGLVersion();
+    SetupVertex();
+
+    while (Running) {
+        while (SDL_PollEvent(&Event) != 0) {
+            OnEvent(&Event);
+
+            if (Event.type == SDL_QUIT) Running = false;
+        }
+
+        // Set viewport size and position every frame of animation
+        glViewport(0, 0, WindowWidth, WindowHeight);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        Loop();
+        Render();
+
+        // https://wiki.libsdl.org/SDL_GL_CreateContext
+        SDL_GL_SwapWindow(Window);
+
+        SDL_Delay(1); // Breath
+    }
+
+    Cleanup();
+
+    return 1;
+}
+
+//==============================================================================
+App* App::GetInstance() { return &App::Instance; }
+
+int App::GetWindowWidth() { return WindowWidth; }
+int App::GetWindowHeight() { return WindowHeight; }
+
+//==============================================================================
+
 int main(int argc, char* argv[])
 {
-    using namespace std;
-    try {
-        cout << "Author: Tu Tong\nThe second diamond color is Gold\n\n";
-        vector<string> param = vector<string>{ argv, argv + argc };
-        return Project{ 640, 480 }(param);
 
-    }
-    catch (std::exception& e) {
-        std::cerr << e.what() << '\n';
-        return 1;
-    }
+    std::cout << "Hello World!\n";
+    return App::GetInstance()->Execute(argc, argv);
 }
