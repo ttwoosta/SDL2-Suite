@@ -1,7 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30907.101
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SDL2 Template", "SDL2 Template\SDL2 Template.vcxproj", "{40711C05-4046-4D8B-A5C2-D9EFEFFF586B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Math", "Math\Math.vcxproj", "{FE90F6AE-2723-4829-A4A9-C49A6F04455B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,8 +29,23 @@ Global
 		{40711C05-4046-4D8B-A5C2-D9EFEFFF586B}.Release|Win32.Build.0 = Release|Win32
 		{40711C05-4046-4D8B-A5C2-D9EFEFFF586B}.Release|x64.ActiveCfg = Release|x64
 		{40711C05-4046-4D8B-A5C2-D9EFEFFF586B}.Release|x64.Build.0 = Release|x64
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Debug|Win32.Build.0 = Debug|Win32
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Debug|x64.ActiveCfg = Debug|x64
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Debug|x64.Build.0 = Debug|x64
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Profile|Win32.ActiveCfg = Debug|Win32
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Profile|Win32.Build.0 = Debug|Win32
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Profile|x64.ActiveCfg = Debug|x64
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Profile|x64.Build.0 = Debug|x64
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Release|Win32.ActiveCfg = Release|Win32
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Release|Win32.Build.0 = Release|Win32
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Release|x64.ActiveCfg = Release|x64
+		{FE90F6AE-2723-4829-A4A9-C49A6F04455B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AEF1FDCB-0A34-43F7-AC44-0CE8C87A6886}
 	EndGlobalSection
 EndGlobal

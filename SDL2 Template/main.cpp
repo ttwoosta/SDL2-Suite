@@ -156,53 +156,6 @@ public:
 
 };
 
-
-/*-----------------------------------------------------------------------------
- *  FUNCION TO CHECK FOR SHADER COMPILER ERRORS
- *-----------------------------------------------------------------------------*/
-void shaderCompilerCheck(GLuint ID) {
-    GLint comp;
-    glGetShaderiv(ID, GL_COMPILE_STATUS, &comp);
-
-    using namespace std;
-
-    if (comp == GL_FALSE) {
-        cout << "Shader Compilation FAILED" << endl;
-        GLchar messages[256];
-        glGetShaderInfoLog(ID, sizeof(messages), 0, &messages[0]);
-        cout << messages;
-    }
-}
-
-
-/*-----------------------------------------------------------------------------
- *  FUNCION TO CHECK FOR SHADER LINK ERRORS
- *-----------------------------------------------------------------------------*/
-void shaderLinkCheck(GLuint ID) {
-    GLint linkStatus, validateStatus;
-    glGetProgramiv(ID, GL_LINK_STATUS, &linkStatus);
-
-    using namespace std;
-
-    if (linkStatus == GL_FALSE) {
-        cout << "Shader Linking FAILED" << endl;
-        GLchar messages[256];
-        glGetProgramInfoLog(ID, sizeof(messages), 0, &messages[0]);
-        cout << messages;
-    }
-
-    glValidateProgram(ID);
-    glGetProgramiv(ID, GL_VALIDATE_STATUS, &validateStatus);
-
-    if (linkStatus == GL_FALSE) {
-        cout << "Shader Validation FAILED" << endl;
-        GLchar messages[256];
-        glGetProgramInfoLog(ID, sizeof(messages), 0, &messages[0]);
-        cout << messages;
-    }
-
-}
-
 /*-----------------------------------------------------------------------------
  *  CREATE A VERTEX OBJECT
  *-----------------------------------------------------------------------------*/
@@ -218,7 +171,6 @@ private:
     bool Running = true;
 
     SDL_Window* Window = NULL;
-    SDL_Renderer* Renderer = NULL;
     SDL_Surface* PrimarySurface = NULL;
     SDL_GLContext glcontext = NULL;
 
@@ -440,16 +392,17 @@ void App::Render() {
 
     BINDVERTEXARRAY(arrayID);
 
+    // https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
     glm::mat4 view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     glm::mat4 proj = glm::perspective(3.14f / 3.f, (float)WindowWidth / WindowHeight, 0.1f, -10.f);
 
+    // https://open.gl/transformations
     glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(projectionID, 1, GL_FALSE, glm::value_ptr(proj));
 
     glm::mat4 model = glm::rotate(glm::mat4(), time, glm::vec3(0, 1, 0));
     glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
 
-    //glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, elementID);
     glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, 0);
 
     BINDVERTEXARRAY(0);
@@ -457,11 +410,7 @@ void App::Render() {
 
 //------------------------------------------------------------------------------
 void App::Cleanup() {
-    if (Renderer) {
-        SDL_DestroyRenderer(Renderer);
-        Renderer = NULL;
-    }
-
+    
     if (Window) {
         SDL_DestroyWindow(Window);
         Window = NULL;
@@ -493,8 +442,7 @@ int App::Execute(int argc, char* argv[]) {
 
         // Set viewport size and position every frame of animation
         glViewport(0, 0, WindowWidth, WindowHeight);
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         Loop();
         Render();
