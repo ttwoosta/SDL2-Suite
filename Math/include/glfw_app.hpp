@@ -28,7 +28,7 @@ struct App{
     Window mWindow;
     Window& window() { return mWindow; }
 
-    App(int w = 640, int h=480)  {
+    App(int w = 1024, int h=768)  {
 
       /*-----------------------------------------------------------------------------
        *  Initialize GLFW

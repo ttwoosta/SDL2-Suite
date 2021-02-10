@@ -18,8 +18,15 @@
 #include "glfw_app.hpp"
 #include "gl_shader.hpp"
 #include "gl_macros.hpp"
-
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <iostream>
 #include <vector>
+
+using namespace std;
+//using namespace glm;
+
 
 
 using namespace lynda;
@@ -27,15 +34,19 @@ using namespace std;
 
 const char* vert = GLSL(120,
     attribute vec4 position;
-attribute vec2 textureCoordinate;              //<-- Texture Coordinate Attribute
+    attribute vec2 textureCoordinate;              //<-- Texture Coordinate Attribute
 
-varying vec2 texCoord;                         //<-- To be passed to fragment shader
+    uniform mat4 model;
+    uniform mat4 view;                 //<-- 4x4 Transformation Matrices
+    uniform mat4 projection;
 
-void main(void) {
-    texCoord = textureCoordinate;
+    varying vec2 texCoord;                         //<-- To be passed to fragment shader
 
-    gl_Position = position;
-}
+    void main(void) {
+        texCoord = textureCoordinate;
+
+        gl_Position = projection * view * model * position;
+    }
 
 );
 
@@ -43,14 +54,13 @@ const char* frag = GLSL(120,
 
     uniform sampler2D texture;                       //<-- The texture itself
 
-varying vec2 texCoord;                           //<-- coordinate passed in from vertex shader
+    varying vec2 texCoord;                           //<-- coordinate passed in from vertex shader
 
-void main(void) {
-    gl_FragColor = texture2D(texture, texCoord); //<-- look up the coordinate's value
-}
+    void main(void) {
+        gl_FragColor = texture2D(texture, texCoord); //<-- look up the coordinate's value
+    }
 
 );
-
 
 struct vec2 {
     vec2(float _x = 0, float _y = 0) : x(_x), y(_y) {}
@@ -74,13 +84,17 @@ struct MyApp : App {
     int th, tw;
 
     Shader* shader;
-
+    int keyCode;                          //<-- to store last key pressed
     GLuint tID;
     GLuint arrayID;
     GLuint bufferID;
     GLuint positionID;
     GLuint textureCoordinateID;
     GLuint samplerID;
+
+    GLuint modelID;
+    GLuint viewID;
+    GLuint projectionID;
 
 
     MyApp() : App() { init(); }
@@ -92,10 +106,10 @@ struct MyApp : App {
          *-----------------------------------------------------------------------------*/
          //                  position      texture coord
         Vertex slab[] = {
-                          {vec2(-.8,-.8), vec2(0,0)}, //bottom-left
-                          {vec2(-.8, .8), vec2(0,1)}, //top-left
-                          {vec2(.8, .8), vec2(1,1)}, //top-right
-                          {vec2(.8,-.8), vec2(1,0)}  //bottom-right
+                          {vec2(-.4,-.4), vec2(0,0)}, //bottom-left
+                          {vec2(-.4, .4), vec2(0,0.5)}, //top-left
+                          {vec2(.4, .4), vec2(.5,.5)}, //top-right
+                          {vec2(.4,-.4), vec2(.5,0)}  //bottom-right
         };
 
 
@@ -128,7 +142,18 @@ struct MyApp : App {
         positionID = glGetAttribLocation(shader->id(), "position");
         textureCoordinateID = glGetAttribLocation(shader->id(), "textureCoordinate");
 
-        //  samplerID = glGetUniformLocation( shader->id(), "texture" );               //<-- unnecessary if only using one texture           
+        modelID = glGetUniformLocation(shader->id(), "model");
+        viewID = glGetUniformLocation(shader->id(), "view");
+        projectionID = glGetUniformLocation(shader->id(), "projection");
+
+        //  samplerID = glGetUniformLocation( shader->id(), "texture" );  
+        //<-- unnecessary if only using one texture    
+
+        glm::mat4 transform = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+        glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(transform));
+        glUniformMatrix4fv(projectionID, 1, GL_FALSE, glm::value_ptr(transform));
+        glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(transform));
+        
 
          /*-----------------------------------------------------------------------------
           *  Generate And Bind Vertex Array Object
@@ -197,10 +222,52 @@ struct MyApp : App {
 
     }
 
+    glm::vec3 m_vector = glm::vec3(0);
+    GLfloat m_speed = 0.005f;
+    GLfloat m_angle = 0.0f;
+
     void onDraw() {
 
         glUseProgram(shader->id());          //<-- 1. Bind Shader
         glBindTexture(GL_TEXTURE_2D, tID);   //<-- 2. Bind Texture
+
+        // create transformations
+        if (keyCode == GLFW_KEY_KP_0) 
+        {
+            glm::mat4 transform = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+            glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(transform));
+            glUniformMatrix4fv(projectionID, 1, GL_FALSE, glm::value_ptr(transform));
+            glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(transform));
+
+        }
+        else if (keyCode == GLFW_KEY_KP_1)
+        {
+            m_angle = (float)glfwGetTime();
+
+            glm::mat4 transform = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+            transform = glm::translate(transform, m_vector);
+            transform = glm::rotate(transform, m_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+            glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(transform));
+        }
+        else if (keyCode >= GLFW_KEY_RIGHT && keyCode <= GLFW_KEY_UP)
+        {
+
+            if (keyCode == GLFW_KEY_LEFT && m_vector.x > -0.5f)
+                m_vector.x -= m_speed;
+            else if (keyCode == GLFW_KEY_RIGHT && m_vector.x < 0.5f)
+                m_vector.x += m_speed;
+            else if (keyCode == GLFW_KEY_DOWN && m_vector.y > -0.5f)
+                m_vector.y -= m_speed;
+            else if (keyCode == GLFW_KEY_UP && m_vector.y < 0.5f)
+                m_vector.y += m_speed;
+
+            glm::mat4 transform = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+            transform = glm::translate(transform, m_vector);
+            transform = glm::rotate(transform, m_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+            glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(transform));
+        }
 
         BINDVERTEXARRAY(arrayID);              //<-- 3. Bind VAO
         glDrawArrays(GL_QUADS, 0, 4);         //<-- 4. Draw the four slab vertices
@@ -211,6 +278,19 @@ struct MyApp : App {
 
     }
 
+    void onKeyDown(int key, int action) {
+        if (action == GLFW_PRESS) {
+            keyCode = key;
+            if (keyCode == GLFW_KEY_KP_0)
+                cout << "Revert Transform" << endl;
+            else
+                cout << "Apply tranform" << endl;
+        }
+
+        if (action == GLFW_RELEASE) {
+            keyCode = -1;
+        }
+    }
 };
 
 

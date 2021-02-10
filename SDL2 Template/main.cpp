@@ -1,3 +1,16 @@
+/*
+* Author: Tu Tong
+* Date: Feb 10, 2021
+* Class: Game Programming
+* Project created by Nevin Flanagan on 12/22/20.
+* 
+* Project base on http://www.sdltutorials.com/ 
+* https://github.com/MetaCipher/sdl-2.0-textures
+* 
+* The original draw source code from the course Learning OpenGL
+* https://www.linkedin.com/learning/learning-opengl?u=67554802
+*/
+
 //==============================================================================
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
@@ -211,6 +224,9 @@ private:
     // Free up resources
     void Cleanup();
 
+    // Keyboard event handler
+    void KeyboardKeyDown(SDL_KeyboardEvent kEvent);
+
 public:
     int Execute(int argc, char* argv[]);
     void SetupVertex();
@@ -385,12 +401,19 @@ void App::SetupVertex() {
 void App::Loop() {
 }
 
+glm::vec3 m_vector = glm::vec3(0);
+bool spinning = false;
+SDL_Keycode keySym = SDLK_0;
+
+static float m_time = 0.0;
+
 //------------------------------------------------------------------------------
 void App::Render() {
-    static float time = 0.0;
-    time += .01;
+    m_time += .01;
 
     BINDVERTEXARRAY(arrayID);
+
+    using namespace glm;
 
     // https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
     glm::mat4 view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
@@ -400,12 +423,44 @@ void App::Render() {
     glUniformMatrix4fv(viewID, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(projectionID, 1, GL_FALSE, glm::value_ptr(proj));
 
-    glm::mat4 model = glm::rotate(glm::mat4(), time, glm::vec3(0, 1, 0));
-    glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
+    if (spinning)
+    {
+        glm::mat4 model = glm::rotate(glm::mat4(), m_time, m_vector);
+        glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
+    }
+    else {
+        glm::mat4 model = glm::rotate(glm::mat4(), 0.0f, glm::vec3(1, 1, 1));
+        glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
+    }
 
     glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, 0);
 
     BINDVERTEXARRAY(0);
+}
+
+//------------------------------------------------------------------------------
+void App::KeyboardKeyDown(SDL_KeyboardEvent kEvent) 
+{
+    using namespace std;
+
+    if (keySym == SDLK_LEFT || keySym == SDLK_RIGHT || keySym == SDLK_UP || keySym == SDLK_DOWN)
+    {
+        spinning = true;
+        m_vector = glm::vec3(0, 0, 0);
+
+        if (keySym == SDLK_LEFT)
+            m_vector.y = -1;
+        else if (keySym == SDLK_RIGHT)
+            m_vector.y = 1;
+
+        if (keySym == SDLK_DOWN)
+            m_vector.x = 1;
+        else if (keySym == SDLK_UP)
+            m_vector.x = -1;
+    }
+    else {
+        spinning = false;
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -433,11 +488,25 @@ int App::Execute(int argc, char* argv[]) {
     getGLVersion();
     SetupVertex();
 
+    using namespace std;
+
     while (Running) {
         while (SDL_PollEvent(&Event) != 0) {
             OnEvent(&Event);
 
             if (Event.type == SDL_QUIT) Running = false;
+
+            if (Event.type == SDL_MOUSEBUTTONUP) {
+                int x, y;
+                SDL_GetMouseState(&x, &y);
+                printf("Mouse up at position: (%d, %d)\n", x, y);
+            }
+            
+            if (Event.type == SDL_KEYDOWN) {
+                keySym = Event.key.keysym.sym;
+                KeyboardKeyDown(Event.key);
+            }
+            
         }
 
         // Set viewport size and position every frame of animation
@@ -468,7 +537,8 @@ int App::GetWindowHeight() { return WindowHeight; }
 
 int main(int argc, char* argv[])
 {
-
-    std::cout << "Hello World!\n";
+    std::cout << "Author: Tu Tong\n";
+    std::cout << "Use arrow keys to rotate the cube or\n";
+    std::cout << "Press any key to reset position\n";
     return App::GetInstance()->Execute(argc, argv);
 }
