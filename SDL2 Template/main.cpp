@@ -3,10 +3,10 @@
 * Date: Feb 10, 2021
 * Class: Game Programming
 * Project created by Nevin Flanagan on 12/22/20.
-* 
-* Project base on http://www.sdltutorials.com/ 
+*
+* Project base on http://www.sdltutorials.com/
 * https://github.com/MetaCipher/sdl-2.0-textures
-* 
+*
 * The original draw source code from the course Learning OpenGL
 * https://www.linkedin.com/learning/learning-opengl?u=67554802
 */
@@ -44,18 +44,18 @@
 const char* vert = GLSL(120,
 
     attribute vec4 position;
-    attribute vec4 color;
+attribute vec4 color;
 
-    varying vec4 dstColor;
+varying vec4 dstColor;
 
-    uniform mat4 model;
-    uniform mat4 view;                 //<-- 4x4 Transformation Matrices
-    uniform mat4 projection;
+uniform mat4 model;
+uniform mat4 view;                 //<-- 4x4 Transformation Matrices
+uniform mat4 projection;
 
-    void main() {
-        dstColor = color;
-        gl_Position = projection * view * model * position;   //<-- Apply transformation 
-    }
+void main() {
+    dstColor = color;
+    gl_Position = projection * view * model * position;   //<-- Apply transformation 
+}
 
 );
 
@@ -63,9 +63,9 @@ const char* frag = GLSL(120,
 
     varying vec4 dstColor;
 
-    void main() {
-        gl_FragColor = dstColor;
-    }
+void main() {
+    gl_FragColor = dstColor;
+}
 
 );
 
@@ -416,7 +416,7 @@ void App::Render() {
     using namespace glm;
 
     // https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
-    glm::mat4 view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    glm::mat4 view = glm::lookAt(glm::vec3(0, 2, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     glm::mat4 proj = glm::perspective(3.14f / 3.f, (float)WindowWidth / WindowHeight, 0.1f, -10.f);
 
     // https://open.gl/transformations
@@ -429,7 +429,7 @@ void App::Render() {
         glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
     }
     else {
-        glm::mat4 model = glm::rotate(glm::mat4(), 0.0f, glm::vec3(1, 1, 1));
+        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(45.0f), glm::vec3(0, 1, 0));
         glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
     }
 
@@ -439,7 +439,7 @@ void App::Render() {
 }
 
 //------------------------------------------------------------------------------
-void App::KeyboardKeyDown(SDL_KeyboardEvent kEvent) 
+void App::KeyboardKeyDown(SDL_KeyboardEvent kEvent)
 {
     using namespace std;
 
@@ -465,7 +465,7 @@ void App::KeyboardKeyDown(SDL_KeyboardEvent kEvent)
 
 //------------------------------------------------------------------------------
 void App::Cleanup() {
-    
+
     if (Window) {
         SDL_DestroyWindow(Window);
         Window = NULL;
@@ -499,14 +499,15 @@ int App::Execute(int argc, char* argv[]) {
             if (Event.type == SDL_MOUSEBUTTONUP) {
                 int x, y;
                 SDL_GetMouseState(&x, &y);
-                printf("Mouse up at position: (%d, %d)\n", x, y);
+                //printf("Mouse up at position: (%d, %d)\n", x, y);
+                printf("Time %f | rotate (%f, %f)\n", m_time, m_vector.x, m_vector.y);
             }
-            
+
             if (Event.type == SDL_KEYDOWN) {
                 keySym = Event.key.keysym.sym;
                 KeyboardKeyDown(Event.key);
             }
-            
+
         }
 
         // Set viewport size and position every frame of animation
