@@ -302,23 +302,56 @@ bool App::Init() {
     return true;
 }
 
+static const int kNumVertecies = 36;
+
 void App::SetupVertex() {
 
     using namespace glm;
 
     //Specify the 8 VERTICES of A Cube
     Vertex cube[] = {
-        {glm::vec3(1, -1,  1), glm::vec4(1,0,0,1)},
-        {glm::vec3(1,  1,  1), glm::vec4(0,1,0,1)},
-        {glm::vec3(-1,  1,  1), glm::vec4(0,0,1,1)},
-        {glm::vec3(-1, -1,  1), glm::vec4(1,0,0,1)},
+        {glm::vec3(1, -1,  1), glm::vec4(1,0,0,1)},  // red
+        {glm::vec3(1,  1,  1), glm::vec4(0,1,0,1)},  // green
+        {glm::vec3(-1,  1,  1), glm::vec4(0,0,1,1)}, // blue 
+        {glm::vec3(-1, -1,  1), glm::vec4(0,1,1,1)}, // cyan
 
-        {glm::vec3(1, -1, -1), glm::vec4(0,1,0,1)},
-        {glm::vec3(1,  1, -1), glm::vec4(0,0,1,1)},
-        {glm::vec3(-1,  1, -1), glm::vec4(1,0,0,1)},
-        {glm::vec3(-1, -1, -1), glm::vec4(0,1,0,1)}
+        {glm::vec3(1, -1, -1), glm::vec4(1,0,1,1)},  // magenta
+        {glm::vec3(1,  1, -1), glm::vec4(1,1,0,1)},  // yellow
+        {glm::vec3(-1,  1, -1), glm::vec4(1,1,1,1)}, // white
+        {glm::vec3(-1, -1, -1), glm::vec4(0,0,0,1)}  // black
     };
 
+
+    //6-------------/5
+  //  .           // |
+//2--------------1   |
+//    .          |   |
+//    .          |   |
+//    .          |   |
+//    .          |   |
+//    7.......   |   /4
+//               | //
+//3--------------/0    
+
+    GLubyte indices_triangluate[kNumVertecies] = {
+        0, 1, 2, // front
+        0, 3, 2,
+        
+        4, 5, 6, // back
+        4, 7, 6,
+
+        3, 2, 6, // left
+        3, 7, 6,
+
+        0, 1, 5, // right
+        0, 4, 5,
+
+        1, 2, 6, // top
+        1, 5, 6,
+
+        0, 3, 7, // bottom
+        0, 4, 7,
+    };
 
     //6-------------/5
   //  .           // |
@@ -338,6 +371,8 @@ void App::SetupVertex() {
                       4,5,1,0, //right
                       1,5,6,2, //top
                       4,0,3,7 }; //bottom
+
+    
 
     /*-----------------------------------------------------------------------------
      *  CREATE THE SHADER
@@ -377,7 +412,7 @@ void App::SetupVertex() {
     *-----------------------------------------------------------------------------*/
     glGenBuffers(1, &elementID);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementID);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 24 * sizeof(GLubyte), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, kNumVertecies * sizeof(GLubyte), indices_triangluate, GL_STATIC_DRAW);
 
 
     /*-----------------------------------------------------------------------------
@@ -416,6 +451,7 @@ void App::Render() {
     using namespace glm;
 
     // https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
+    // https://glm.g-truc.net/0.9.9/api/a00665.html#ga747c8cf99458663dd7ad1bb3a2f07787
     glm::mat4 view = glm::lookAt(glm::vec3(0, 2, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     glm::mat4 proj = glm::perspective(3.14f / 3.f, (float)WindowWidth / WindowHeight, 0.1f, -10.f);
 
@@ -429,11 +465,11 @@ void App::Render() {
         glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
     }
     else {
-        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(45.0f), glm::vec3(0, 1, 0));
+        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(30.0f), glm::vec3(0, 1, 0));
         glUniformMatrix4fv(modelID, 1, GL_FALSE, glm::value_ptr(model));
     }
 
-    glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, 0);
+    glDrawElements(GL_TRIANGLES, kNumVertecies, GL_UNSIGNED_BYTE, 0);
 
     BINDVERTEXARRAY(0);
 }
@@ -538,7 +574,7 @@ int App::GetWindowHeight() { return WindowHeight; }
 
 int main(int argc, char* argv[])
 {
-    std::cout << "Author: Tu Tong\n";
+    std::cout << "Author: Tu Tong (0262620)\n";
     std::cout << "Use arrow keys to rotate the cube or\n";
     std::cout << "Press any key to reset position\n";
     return App::GetInstance()->Execute(argc, argv);
